@@ -3,6 +3,7 @@ package com.ociweb;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ociweb.pronghorn.ExampleProducerStage;
+import com.ociweb.pronghorn.pipe.ChannelReader;
 import com.ociweb.pronghorn.pipe.ChannelWriter;
 import com.ociweb.pronghorn.pipe.DataOutputBlobWriter;
 import com.ociweb.pronghorn.pipe.Pipe;
@@ -31,30 +32,42 @@ public class SchemaTest {
 
     }
 
+    /**
+     * Creates a new GraphManager and demonstrates how to write to a pipe directly using low-level API.
+     * Then, verifies that content in output pipe from replicator is the same as content in input pipe.
+     */
     @Test
     void checkPrepopulatedPipeData() {
 
         GraphManager gm = new GraphManager();
 
-        Pipe pipe = SchemaOneSchema.instance.newPipe(50, 500);
+        Pipe inputPipe = SchemaOneSchema.instance.newPipe(50, 500);
+        Pipe outputPipe = SchemaOneSchema.instance.newPipe(50, 500);
 
-        pipe.initBuffers();
+        //Pipe outputPipe = PipeNoOp.newInstance()
 
-        int size = Pipe.addMsgIdx(pipe, SchemaOneSchema.MSG_SOMEOTHERMESSAGE_2);
+        inputPipe.initBuffers();
 
-        ChannelWriter cw = Pipe.openOutputStream(pipe);
+        int size = Pipe.addMsgIdx(inputPipe, SchemaOneSchema.MSG_SOMEOTHERMESSAGE_2);
+
+        ChannelWriter cw = Pipe.openOutputStream(inputPipe);
 
         cw.writeInt(1000);
         cw.writeLong(500000000);
 
         ((DataOutputBlobWriter) cw).closeLowLevelField();
 
-        Pipe.confirmLowLevelWrite(pipe, size);
-        Pipe.publishWrites(pipe);
+        Pipe.confirmLowLevelWrite(inputPipe, size);
+        Pipe.publishWrites(inputPipe);
 
-        //Pipe emptyPipe = PipeNoOp.newInstance()
+        //Do we still need a scheduler?
 
-        ReplicatorStage.newInstance(gm, pipe, PronghornStage.NONE);
+
+        ReplicatorStage.newInstance(gm, inputPipe, outputPipe);
+
+        //NOW, read what's written onto the outputPipe!
+
+
 
         gm.enableTelemetry(7779);
 
